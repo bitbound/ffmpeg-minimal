@@ -10,6 +10,8 @@ on:
 jobs:
   build-macos-intel:
     runs-on: macos-13  # Intel runner
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -78,6 +80,8 @@ jobs:
 
   build-macos-arm64:
     runs-on: macos-14  # Apple Silicon runner
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
