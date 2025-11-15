@@ -53,27 +53,9 @@ jobs:
           cd ffmpeg-source
           PKG_CONFIG_PATH=$PWD/../x264-linux/lib/pkgconfig ./configure \
             --prefix=$PWD/../ffmpeg-linux-amd64 \
+            --disable-everything \
             --enable-gpl \
             --enable-libx264 \
-            --disable-ffplay \
-            --disable-ffprobe \
-            --disable-doc \
-            --disable-htmlpages \
-            --disable-manpages \
-            --disable-podpages \
-            --disable-txtpages \
-            --disable-network \
-            --disable-debug \
-            --disable-sdl2 \
-            --disable-iconv \
-            --disable-libxcb \
-            --disable-libxcb-shm \
-            --disable-libxcb-xfixes \
-            --disable-libxcb-shape \
-            --disable-xlib \
-            --disable-zlib \
-            --disable-bzlib \
-            --disable-lzma \
             --enable-indev=x11grab \
             --enable-indev=lavfi \
             --enable-decoder=rawvideo \
@@ -82,6 +64,8 @@ jobs:
             --enable-muxer=mpegts \
             --enable-filter=scale \
             --enable-filter=format \
+            --disable-doc \
+            --disable-debug \
             --extra-cflags="-I$PWD/../x264-linux/include" \
             --extra-ldflags="-L$PWD/../x264-linux/lib"
           make -j$(nproc)
@@ -126,23 +110,10 @@ jobs:
             --target-os=mingw32 \
             --cross-prefix=x86_64-w64-mingw32- \
             --prefix=$PWD/../ffmpeg-win64 \
+            --disable-everything \
             --enable-gpl \
             --enable-libx264 \
             --enable-cross-compile \
-            --disable-ffplay \
-            --disable-ffprobe \
-            --disable-doc \
-            --disable-htmlpages \
-            --disable-manpages \
-            --disable-podpages \
-            --disable-txtpages \
-            --disable-network \
-            --disable-debug \
-            --disable-sdl2 \
-            --disable-iconv \
-            --disable-zlib \
-            --disable-bzlib \
-            --disable-lzma \
             --enable-indev=dshow \
             --enable-indev=gdigrab \
             --enable-indev=lavfi \
@@ -152,6 +123,8 @@ jobs:
             --enable-muxer=mpegts \
             --enable-filter=scale \
             --enable-filter=format \
+            --disable-doc \
+            --disable-debug \
             --extra-cflags="-I$PWD/../x264-win64/include" \
             --extra-ldflags="-L$PWD/../x264-win64/lib"
           make -j$(nproc)
@@ -167,23 +140,10 @@ jobs:
             --target-os=mingw32 \
             --cross-prefix=i686-w64-mingw32- \
             --prefix=$PWD/../ffmpeg-win32 \
+            --disable-everything \
             --enable-gpl \
             --enable-libx264 \
             --enable-cross-compile \
-            --disable-ffplay \
-            --disable-ffprobe \
-            --disable-doc \
-            --disable-htmlpages \
-            --disable-manpages \
-            --disable-podpages \
-            --disable-txtpages \
-            --disable-network \
-            --disable-debug \
-            --disable-sdl2 \
-            --disable-iconv \
-            --disable-zlib \
-            --disable-bzlib \
-            --disable-lzma \
             --enable-indev=dshow \
             --enable-indev=gdigrab \
             --enable-indev=lavfi \
@@ -193,6 +153,8 @@ jobs:
             --enable-muxer=mpegts \
             --enable-filter=scale \
             --enable-filter=format \
+            --disable-doc \
+            --disable-debug \
             --extra-cflags="-I$PWD/../x264-win32/include" \
             --extra-ldflags="-L$PWD/../x264-win32/lib"
           make -j$(nproc)

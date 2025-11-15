@@ -21,13 +21,14 @@ The GitHub Actions workflows automatically build FFmpeg for:
 
 ## Build Configuration
 
-All builds are configured with:
+All builds use `--disable-everything` then explicitly enable only what's needed:
 - **Enabled**: GPL, libx264 encoder, rawvideo decoder, mpegts muxer, pipe protocol, scale/format filters
-- **Disabled**: ffplay, ffprobe, documentation, network protocols, most codecs, SDL2, and unused libraries
 - **Platform-specific capture**: 
   - Windows: dshow, gdigrab (Desktop Duplication API support via DXGI)
   - Linux: x11grab (X11), lavfi
   - macOS: avfoundation
+
+This approach ensures the absolute smallest binary size by disabling all features first, then enabling only the essential components.
 
 ## Technical Decisions
 
