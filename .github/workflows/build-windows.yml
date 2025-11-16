@@ -89,7 +89,7 @@ jobs:
           # Switch to MINGW32 for 32-bit build
           export MSYSTEM=MINGW32
           export PATH="/mingw32/bin:$PATH"
-          
+
           git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source-32
           cd x264-source-32
           ./configure \
@@ -105,7 +105,7 @@ jobs:
           # Switch to MINGW32 for 32-bit build
           export MSYSTEM=MINGW32
           export PATH="/mingw32/bin:$PATH"
-          
+
           cd ffmpeg-source
           make distclean
           PKG_CONFIG_PATH=$PWD/../x264-win32/lib/pkgconfig ./configure \
