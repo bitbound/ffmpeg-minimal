@@ -48,6 +48,12 @@ Download the appropriate binary from GitHub Actions artifacts and use it to capt
 ffmpeg -f gdigrab -framerate 30 -i desktop -c:v libx264 -preset ultrafast -tune zerolatency -f mpegts -
 ```
 
+Local testing example:
+
+```
+ffmpeg -f gdigrab -framerate 30 -i desktop -vf "scale=1280:720,format=yuv420p" -c:v libx264 -preset ultrafast -tune zerolatency -f mpegts - > output.ts
+```
+
 ### Linux (X11)
 ```bash
 ffmpeg -f x11grab -framerate 30 -i :0.0 -c:v libx264 -preset ultrafast -tune zerolatency -f mpegts -
