@@ -1,0 +1,145 @@
+name: Build Windows FFmpeg
+
+on:
+  workflow_dispatch:
+    inputs:
+      capture_device:
+        description: 'Screen capture device to use'
+        required: true
+        default: 'gdigrab'
+        type: choice
+        options:
+          - gdigrab
+          - ddagrab
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install MSYS2 and build tools
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-yasm
+            mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-pkg-config
+            mingw-w64-i686-gcc
+            mingw-w64-i686-yasm
+            mingw-w64-i686-nasm
+            mingw-w64-i686-pkg-config
+            git
+            make
+
+      - name: Clone and build x264 for 64-bit
+        shell: msys2 {0}
+        run: |
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source-64
+          cd x264-source-64
+          ./configure \
+            --prefix=$PWD/../x264-win64 \
+            --enable-static \
+            --disable-cli
+          make -j$(nproc)
+          make install
+
+      - name: Clone FFmpeg
+        shell: msys2 {0}
+        run: |
+          git clone --depth 1 --branch release/7.1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-source
+
+      - name: Build Windows 64-bit
+        shell: msys2 {0}
+        run: |
+          cd ffmpeg-source
+          PKG_CONFIG_PATH=$PWD/../x264-win64/lib/pkgconfig ./configure \
+            --prefix=$PWD/../ffmpeg-win64 \
+            --disable-everything \
+            --enable-gpl \
+            --enable-libx264 \
+            --enable-indev=dshow \
+            --enable-indev=${{ github.event.inputs.capture_device }} \
+            --enable-indev=lavfi \
+            --enable-decoder=rawvideo \
+            --enable-encoder=libx264 \
+            --enable-protocol=pipe \
+            --enable-muxer=mpegts \
+            --enable-filter=scale \
+            --enable-filter=format \
+            --disable-doc \
+            --disable-debug \
+            --extra-cflags="-I$PWD/../x264-win64/include" \
+            --extra-ldflags="-L$PWD/../x264-win64/lib"
+          make -j$(nproc)
+          make install
+          strip ../ffmpeg-win64/bin/ffmpeg.exe
+
+      - name: Clone and build x264 for 32-bit
+        shell: msys2 {0}
+        run: |
+          # Switch to MINGW32 for 32-bit build
+          export MSYSTEM=MINGW32
+          export PATH="/mingw32/bin:$PATH"
+          
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source-32
+          cd x264-source-32
+          ./configure \
+            --prefix=$PWD/../x264-win32 \
+            --enable-static \
+            --disable-cli
+          make -j$(nproc)
+          make install
+
+      - name: Build Windows 32-bit
+        shell: msys2 {0}
+        run: |
+          # Switch to MINGW32 for 32-bit build
+          export MSYSTEM=MINGW32
+          export PATH="/mingw32/bin:$PATH"
+          
+          cd ffmpeg-source
+          make distclean
+          PKG_CONFIG_PATH=$PWD/../x264-win32/lib/pkgconfig ./configure \
+            --prefix=$PWD/../ffmpeg-win32 \
+            --disable-everything \
+            --enable-gpl \
+            --enable-libx264 \
+            --enable-indev=dshow \
+            --enable-indev=${{ github.event.inputs.capture_device }} \
+            --enable-indev=lavfi \
+            --enable-decoder=rawvideo \
+            --enable-encoder=libx264 \
+            --enable-protocol=pipe \
+            --enable-muxer=mpegts \
+            --enable-filter=scale \
+            --enable-filter=format \
+            --disable-doc \
+            --disable-debug \
+            --extra-cflags="-I$PWD/../x264-win32/include" \
+            --extra-ldflags="-L$PWD/../x264-win32/lib"
+          make -j$(nproc)
+          make install
+          strip ../ffmpeg-win32/bin/ffmpeg.exe
+
+      - name: Upload Windows 64-bit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-win64-${{ github.event.inputs.capture_device }}
+          path: ffmpeg-win64/bin/ffmpeg.exe
+          if-no-files-found: error
+
+      - name: Upload Windows 32-bit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-win32-${{ github.event.inputs.capture_device }}
+          path: ffmpeg-win32/bin/ffmpeg.exe
+          if-no-files-found: error

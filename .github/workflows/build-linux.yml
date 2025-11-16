@@ -1,0 +1,70 @@
+name: Build Linux FFmpeg
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            yasm \
+            nasm \
+            pkg-config \
+            git
+
+      - name: Clone and build x264 for Linux
+        run: |
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-linux-source
+          cd x264-linux-source
+          ./configure \
+            --prefix=$PWD/../x264-linux \
+            --enable-static \
+            --disable-cli
+          make -j$(nproc)
+          make install
+
+      - name: Clone FFmpeg
+        run: |
+          git clone --depth 1 --branch release/7.1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-source
+
+      - name: Build Linux AMD64
+        run: |
+          cd ffmpeg-source
+          PKG_CONFIG_PATH=$PWD/../x264-linux/lib/pkgconfig ./configure \
+            --prefix=$PWD/../ffmpeg-linux-amd64 \
+            --disable-everything \
+            --enable-gpl \
+            --enable-libx264 \
+            --enable-indev=x11grab \
+            --enable-indev=lavfi \
+            --enable-decoder=rawvideo \
+            --enable-encoder=libx264 \
+            --enable-protocol=pipe \
+            --enable-muxer=mpegts \
+            --enable-filter=scale \
+            --enable-filter=format \
+            --disable-doc \
+            --disable-debug \
+            --extra-cflags="-I$PWD/../x264-linux/include" \
+            --extra-ldflags="-L$PWD/../x264-linux/lib"
+          make -j$(nproc)
+          make install
+          strip ../ffmpeg-linux-amd64/bin/ffmpeg
+
+      - name: Upload Linux AMD64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-amd64
+          path: ffmpeg-linux-amd64/bin/ffmpeg
+          if-no-files-found: error
