@@ -6,7 +6,7 @@ on:
       capture_device:
         description: "Screen capture device to use"
         required: true
-        default: "gdigrab"
+        default: "ddagrab"
         type: choice
         options:
           - ddagrab
