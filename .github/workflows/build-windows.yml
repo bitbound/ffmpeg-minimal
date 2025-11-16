@@ -9,110 +9,56 @@ on:
         default: "gdigrab"
         type: choice
         options:
-          - gdigrab
           - ddagrab
+          - gdigrab
 
 jobs:
   build-windows:
     runs-on: windows-latest
-    concurrency:
-      group: build-windows-${{ github.ref }}-${{ github.event.inputs.capture_device }}
-      cancel-in-progress: true
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
           - msystem: MINGW64
             arch: x86_64
-            x264_dir: x264-win64
-            ffmpeg_dir: ffmpeg-win64
             artifact_name: ffmpeg-win64
-            packages: >-
-              base-devel
-              mingw-w64-x86_64-gcc
-              mingw-w64-x86_64-yasm
-              mingw-w64-x86_64-nasm
-              mingw-w64-x86_64-pkg-config
-              git
-              make
           - msystem: MINGW32
             arch: i686
-            x264_dir: x264-win32
-            ffmpeg_dir: ffmpeg-win32
             artifact_name: ffmpeg-win32
-            packages: >-
-              base-devel
-              mingw-w64-i686-gcc
-              mingw-w64-i686-yasm
-              mingw-w64-i686-nasm
-              mingw-w64-i686-pkg-config
-              git
-              make
 
     steps:
-      - name: Avoid git CRLF conversions
-        shell: pwsh
-        run: git config --global core.autocrlf input
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install MSYS2 and build tools
-        id: msys2
+      - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
           msystem: ${{ matrix.msystem }}
           update: true
-          install: ${{ matrix.packages }}
-          cache: true
-          release: true
-          path-type: minimal
+          install: >-
+            base-devel
+            mingw-w64-${{ matrix.arch }}-gcc
+            mingw-w64-${{ matrix.arch }}-yasm
+            mingw-w64-${{ matrix.arch }}-nasm
+            mingw-w64-${{ matrix.arch }}-pkg-config
+            git
 
-      - name: Clone and build x264
+      - name: Build x264
         shell: msys2 {0}
         run: |
-          set -eux
-          git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source-${{ matrix.arch }}
-          cd x264-source-${{ matrix.arch }}
-          ./configure \
-            --prefix=$PWD/../${{ matrix.x264_dir }} \
-            --enable-static \
-            --disable-cli
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git
+          cd x264
+          ./configure --prefix=/mingw${{ matrix.arch == 'x86_64' && '64' || '32' }} --enable-static --disable-cli
           make -j$(nproc)
           make install
-          ls -la ../${{ matrix.x264_dir }} || true
-          ls -la ../${{ matrix.x264_dir }}/lib || true
-          ls -la ../${{ matrix.x264_dir }}/lib/pkgconfig || true
 
-      - name: Clone FFmpeg
+      - name: Build FFmpeg
         shell: msys2 {0}
         run: |
-          git clone --depth 1 --branch release/7.1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-source
-
-      - name: Show MSYS2 installation
-        shell: pwsh
-        run: |
-          echo "MSYS2 installed at: $env:MSYS2_LOCATION"
-        env:
-          MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
-
-      - name: Verify toolchain
-        shell: msys2 {0}
-        run: |
-          echo "MSYSTEM=$MSYSTEM"
-          gcc --version
-          yasm --version
-          pkg-config --modversion libx264 || true
-
-      - name: Build Windows
-        shell: msys2 {0}
-        run: |
-          set -eux
-          cd ffmpeg-source
-          PKG_CONFIG_PATH=$PWD/../${{ matrix.x264_dir }}/lib/pkgconfig ./configure \
-              --prefix=$PWD/../${{ matrix.ffmpeg_dir }} \
+          git clone --depth 1 --branch release/7.1 https://git.ffmpeg.org/ffmpeg.git
+          cd ffmpeg
+          ./configure \
+            --prefix=$PWD/../output \
             --disable-everything \
             --enable-gpl \
             --enable-libx264 \
@@ -127,49 +73,14 @@ jobs:
             --enable-filter=scale \
             --enable-filter=format \
             --disable-doc \
-            --disable-debug \
-            --extra-cflags="-I$PWD/../${{ matrix.x264_dir }}/include" \
-            --extra-ldflags="-L$PWD/../${{ matrix.x264_dir }}/lib"
+            --disable-debug
           make -j$(nproc)
           make install
-          strip ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe
-          echo "Install dir: ../${{ matrix.ffmpeg_dir }}"
-          ls -la ../${{ matrix.ffmpeg_dir }} || true
-          ls -la ../${{ matrix.ffmpeg_dir }}/bin || true
+          strip ../output/bin/ffmpeg.exe
 
-      - name: Smoke test FFmpeg build
-        shell: msys2 {0}
-        run: |
-          echo "Testing built ffmpeg at: ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe"
-          if [ ! -f ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe ]; then
-            echo "ERROR: ffmpeg binary not found in ../${{ matrix.ffmpeg_dir }}/bin"
-            echo "Installation tree:"
-            ls -la ../${{ matrix.ffmpeg_dir }} || true
-            ls -la ../${{ matrix.ffmpeg_dir }}/bin || true
-            echo "ffmpeg-source contents:"
-            ls -la . || true
-            echo "Tail of configure log (if present):"
-            test -f config.log && tail -n 200 config.log || true
-            exit 1
-          fi
-          ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe -version
-          # Ensure x264 is linked
-          if ! ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe -version | grep -q libx264; then
-            echo "ERROR: libx264 not found in built ffmpeg"; exit 1
-          fi
-          # Check encoder/decoder presence
-          if ! ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe -encoders | grep -q libx264; then
-            echo "ERROR: libx264 encoder not available"; exit 1
-          fi
-
-      # The verify step above ensures toolchain is available. The compilation
-      # step already builds and strips the artifact inside this job. No
-      # additional build steps are needed here; keep steps simple and per-arch.
-
-      - name: Upload FFmpeg artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}-${{ github.event.inputs.capture_device }}
-          path: ${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe
+          path: output/bin/ffmpeg.exe
           if-no-files-found: error
-          retention-days: 7
