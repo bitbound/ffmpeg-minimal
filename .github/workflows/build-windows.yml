@@ -73,6 +73,7 @@ jobs:
       - name: Clone and build x264
         shell: msys2 {0}
         run: |
+          set -eux
           git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source-${{ matrix.arch }}
           cd x264-source-${{ matrix.arch }}
           ./configure \
@@ -81,6 +82,9 @@ jobs:
             --disable-cli
           make -j$(nproc)
           make install
+          ls -la ../${{ matrix.x264_dir }} || true
+          ls -la ../${{ matrix.x264_dir }}/lib || true
+          ls -la ../${{ matrix.x264_dir }}/lib/pkgconfig || true
 
       - name: Clone FFmpeg
         shell: msys2 {0}
@@ -105,6 +109,7 @@ jobs:
       - name: Build Windows
         shell: msys2 {0}
         run: |
+          set -eux
           cd ffmpeg-source
           PKG_CONFIG_PATH=$PWD/../${{ matrix.x264_dir }}/lib/pkgconfig ./configure \
               --prefix=$PWD/../${{ matrix.ffmpeg_dir }} \
@@ -128,11 +133,25 @@ jobs:
           make -j$(nproc)
           make install
           strip ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe
+          echo "Install dir: ../${{ matrix.ffmpeg_dir }}"
+          ls -la ../${{ matrix.ffmpeg_dir }} || true
+          ls -la ../${{ matrix.ffmpeg_dir }}/bin || true
 
       - name: Smoke test FFmpeg build
         shell: msys2 {0}
         run: |
           echo "Testing built ffmpeg at: ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe"
+          if [ ! -f ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe ]; then
+            echo "ERROR: ffmpeg binary not found in ../${{ matrix.ffmpeg_dir }}/bin"
+            echo "Installation tree:"
+            ls -la ../${{ matrix.ffmpeg_dir }} || true
+            ls -la ../${{ matrix.ffmpeg_dir }}/bin || true
+            echo "ffmpeg-source contents:"
+            ls -la . || true
+            echo "Tail of configure log (if present):"
+            test -f config.log && tail -n 200 config.log || true
+            exit 1
+          fi
           ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe -version
           # Ensure x264 is linked
           if ! ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe -version | grep -q libx264; then
