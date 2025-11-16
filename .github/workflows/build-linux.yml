@@ -49,6 +49,7 @@ jobs:
             --enable-indev=x11grab \
             --enable-indev=lavfi \
             --enable-decoder=rawvideo \
+            --enable-demuxer=rawvideo \
             --enable-encoder=libx264 \
             --enable-protocol=pipe \
             --enable-muxer=mpegts \

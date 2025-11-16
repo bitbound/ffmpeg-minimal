@@ -70,6 +70,7 @@ jobs:
             --enable-indev=${{ github.event.inputs.capture_device }} \
             --enable-indev=lavfi \
             --enable-decoder=rawvideo \
+            --enable-demuxer=rawvideo \
             --enable-encoder=libx264 \
             --enable-protocol=pipe \
             --enable-muxer=mpegts \
@@ -117,6 +118,7 @@ jobs:
             --enable-indev=${{ github.event.inputs.capture_device }} \
             --enable-indev=lavfi \
             --enable-decoder=rawvideo \
+            --enable-demuxer=rawvideo \
             --enable-encoder=libx264 \
             --enable-protocol=pipe \
             --enable-muxer=mpegts \
