@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       capture_device:
-        description: 'Screen capture device to use'
+        description: "Screen capture device to use"
         required: true
-        default: 'gdigrab'
+        default: "gdigrab"
         type: choice
         options:
           - gdigrab
@@ -15,38 +15,68 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    concurrency:
+      group: build-windows-${{ github.ref }}-${{ github.event.inputs.capture_device }}
+      cancel-in-progress: true
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - msystem: MINGW64
+            arch: x86_64
+            x264_dir: x264-win64
+            ffmpeg_dir: ffmpeg-win64
+            artifact_name: ffmpeg-win64
+            packages: >-
+              base-devel
+              mingw-w64-x86_64-gcc
+              mingw-w64-x86_64-yasm
+              mingw-w64-x86_64-nasm
+              mingw-w64-x86_64-pkg-config
+              git
+              make
+          - msystem: MINGW32
+            arch: i686
+            x264_dir: x264-win32
+            ffmpeg_dir: ffmpeg-win32
+            artifact_name: ffmpeg-win32
+            packages: >-
+              base-devel
+              mingw-w64-i686-gcc
+              mingw-w64-i686-yasm
+              mingw-w64-i686-nasm
+              mingw-w64-i686-pkg-config
+              git
+              make
 
     steps:
+      - name: Avoid git CRLF conversions
+        shell: pwsh
+        run: git config --global core.autocrlf input
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install MSYS2 and build tools
+        id: msys2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: ${{ matrix.msystem }}
           update: true
-          install: >-
-            base-devel
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-yasm
-            mingw-w64-x86_64-nasm
-            mingw-w64-x86_64-pkg-config
-            mingw-w64-i686-gcc
-            mingw-w64-i686-yasm
-            mingw-w64-i686-nasm
-            mingw-w64-i686-pkg-config
-            git
-            make
+          install: ${{ matrix.packages }}
+          cache: true
+          release: true
+          path-type: minimal
 
-      - name: Clone and build x264 for 64-bit
+      - name: Clone and build x264
         shell: msys2 {0}
         run: |
-          git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source-64
-          cd x264-source-64
+          git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source-${{ matrix.arch }}
+          cd x264-source-${{ matrix.arch }}
           ./configure \
-            --prefix=$PWD/../x264-win64 \
+            --prefix=$PWD/../${{ matrix.x264_dir }} \
             --enable-static \
             --disable-cli
           make -j$(nproc)
@@ -57,12 +87,27 @@ jobs:
         run: |
           git clone --depth 1 --branch release/7.1 https://git.ffmpeg.org/ffmpeg.git ffmpeg-source
 
-      - name: Build Windows 64-bit
+      - name: Show MSYS2 installation
+        shell: pwsh
+        run: |
+          echo "MSYS2 installed at: $env:MSYS2_LOCATION"
+        env:
+          MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
+
+      - name: Verify toolchain
+        shell: msys2 {0}
+        run: |
+          echo "MSYSTEM=$MSYSTEM"
+          gcc --version
+          yasm --version
+          pkg-config --modversion libx264 || true
+
+      - name: Build Windows
         shell: msys2 {0}
         run: |
           cd ffmpeg-source
-          PKG_CONFIG_PATH=$PWD/../x264-win64/lib/pkgconfig ./configure \
-            --prefix=$PWD/../ffmpeg-win64 \
+          PKG_CONFIG_PATH=$PWD/../${{ matrix.x264_dir }}/lib/pkgconfig ./configure \
+              --prefix=$PWD/../${{ matrix.ffmpeg_dir }} \
             --disable-everything \
             --enable-gpl \
             --enable-libx264 \
@@ -78,79 +123,34 @@ jobs:
             --enable-filter=format \
             --disable-doc \
             --disable-debug \
-            --extra-cflags="-I$PWD/../x264-win64/include" \
-            --extra-ldflags="-L$PWD/../x264-win64/lib"
+            --extra-cflags="-I$PWD/../${{ matrix.x264_dir }}/include" \
+            --extra-ldflags="-L$PWD/../${{ matrix.x264_dir }}/lib"
           make -j$(nproc)
           make install
-          strip ../ffmpeg-win64/bin/ffmpeg.exe
+          strip ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe
 
-      - name: Clone and build x264 for 32-bit
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW32
-          update: true
-          install: >-
-            mingw-w64-i686-gcc
-            mingw-w64-i686-yasm
-            mingw-w64-i686-nasm
-            mingw-w64-i686-pkg-config
-            git
-            make
-
-      - name: Clone and build x264 for 32-bit
+      - name: Smoke test FFmpeg build
         shell: msys2 {0}
         run: |
-          git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source-32
-          cd x264-source-32
-          ./configure \
-            --prefix=$PWD/../x264-win32 \
-            --enable-static \
-            --disable-cli
-          make -j$(nproc)
-          make install
+          echo "Testing built ffmpeg at: ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe"
+          ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe -version
+          # Ensure x264 is linked
+          if ! ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe -version | grep -q libx264; then
+            echo "ERROR: libx264 not found in built ffmpeg"; exit 1
+          fi
+          # Check encoder/decoder presence
+          if ! ../${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe -encoders | grep -q libx264; then
+            echo "ERROR: libx264 encoder not available"; exit 1
+          fi
 
-      - name: Build Windows 32-bit
-        shell: msys2 {0}
-        run: |
-          # Switch to MINGW32 for 32-bit build
-          export MSYSTEM=MINGW32
-          export PATH="/mingw32/bin:$PATH"
+      # The verify step above ensures toolchain is available. The compilation
+      # step already builds and strips the artifact inside this job. No
+      # additional build steps are needed here; keep steps simple and per-arch.
 
-          cd ffmpeg-source
-          make distclean
-          PKG_CONFIG_PATH=$PWD/../x264-win32/lib/pkgconfig ./configure \
-            --prefix=$PWD/../ffmpeg-win32 \
-            --disable-everything \
-            --enable-gpl \
-            --enable-libx264 \
-            --enable-indev=dshow \
-            --enable-indev=${{ github.event.inputs.capture_device }} \
-            --enable-indev=lavfi \
-            --enable-decoder=rawvideo \
-            --enable-demuxer=rawvideo \
-            --enable-encoder=libx264 \
-            --enable-protocol=pipe \
-            --enable-muxer=mpegts \
-            --enable-filter=scale \
-            --enable-filter=format \
-            --disable-doc \
-            --disable-debug \
-            --extra-cflags="-I$PWD/../x264-win32/include" \
-            --extra-ldflags="-L$PWD/../x264-win32/lib"
-          make -j$(nproc)
-          make install
-          strip ../ffmpeg-win32/bin/ffmpeg.exe
-
-      - name: Upload Windows 64-bit artifact
+      - name: Upload FFmpeg artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-win64-${{ github.event.inputs.capture_device }}
-          path: ffmpeg-win64/bin/ffmpeg.exe
+          name: ${{ matrix.artifact_name }}-${{ github.event.inputs.capture_device }}
+          path: ${{ matrix.ffmpeg_dir }}/bin/ffmpeg.exe
           if-no-files-found: error
-
-      - name: Upload Windows 32-bit artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ffmpeg-win32-${{ github.event.inputs.capture_device }}
-          path: ffmpeg-win32/bin/ffmpeg.exe
-          if-no-files-found: error
+          retention-days: 7
