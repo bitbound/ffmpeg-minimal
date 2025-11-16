@@ -85,12 +85,21 @@ jobs:
           strip ../ffmpeg-win64/bin/ffmpeg.exe
 
       - name: Clone and build x264 for 32-bit
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          update: true
+          install: >-
+            mingw-w64-i686-gcc
+            mingw-w64-i686-yasm
+            mingw-w64-i686-nasm
+            mingw-w64-i686-pkg-config
+            git
+            make
+
+      - name: Clone and build x264 for 32-bit
         shell: msys2 {0}
         run: |
-          # Switch to MINGW32 for 32-bit build
-          export MSYSTEM=MINGW32
-          export PATH="/mingw32/bin:$PATH"
-
           git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source-32
           cd x264-source-32
           ./configure \
