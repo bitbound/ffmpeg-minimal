@@ -26,9 +26,11 @@ jobs:
             arch: i686
             artifact_name: ffmpeg-win32
 
+    env:
+      X264_REF: b35605ace3ddf7c1a5d67a2eb553f034aef41d55
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
@@ -43,11 +45,19 @@ jobs:
             mingw-w64-${{ matrix.arch }}-pkg-config
             git
 
+      - name: Cache x264 MSYS2
+        uses: actions/cache@v4
+        with:
+          path: "C:\\msys64\\mingw${{ matrix.arch == 'x86_64' && '64' || '32' }}"
+          key: x264-msys2-${{ matrix.arch }}-${{ env.X264_REF }}-${{ runner.os }}
+
       - name: Build x264
         shell: msys2 {0}
         run: |
           git clone --depth 1 https://code.videolan.org/videolan/x264.git
           cd x264
+          git fetch --depth 1 origin $X264_REF || true
+          git checkout $X264_REF
           ./configure --prefix=/mingw${{ matrix.arch == 'x86_64' && '64' || '32' }} --enable-static --disable-cli
           make -j$(nproc)
           make install

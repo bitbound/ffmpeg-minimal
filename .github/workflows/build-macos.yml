@@ -8,19 +8,29 @@ jobs:
     runs-on: macos-13  # Intel runner
     permissions:
       contents: read
+    env:
+      X264_REF: b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
           brew install yasm nasm pkg-config
 
+      - name: Cache x264 macOS build
+        uses: actions/cache@v4
+        with:
+          path: x264-install
+          key: x264-macos-${{ runner.os }}-${{ env.X264_REF }}
+
       - name: Clone and build x264
         run: |
           git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source
           cd x264-source
+          git fetch --depth 1 origin $X264_REF || true
+          git checkout $X264_REF
           ./configure \
             --prefix=$PWD/../x264-install \
             --enable-static \
@@ -65,22 +75,32 @@ jobs:
           if-no-files-found: error
 
   build-macos-arm64:
-    runs-on: macos-14  # Apple Silicon runner
+    runs-on: macos-latest
     permissions:
       contents: read
+    env:
+      X264_REF: b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
           brew install yasm nasm pkg-config
 
+      - name: Cache x264 macOS build
+        uses: actions/cache@v4
+        with:
+          path: x264-install
+          key: x264-macos-${{ runner.os }}-${{ env.X264_REF }}
+
       - name: Clone and build x264
         run: |
           git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source
           cd x264-source
+          git fetch --depth 1 origin $X264_REF || true
+          git checkout $X264_REF
           ./configure \
             --prefix=$PWD/../x264-install \
             --enable-static \

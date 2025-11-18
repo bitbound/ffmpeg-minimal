@@ -8,10 +8,12 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+    env:
+      X264_REF: b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
@@ -29,10 +31,18 @@ jobs:
             g++-mingw-w64-x86-64 \
             g++-mingw-w64-i686
 
+      - name: Cache x264 Linux build
+        uses: actions/cache@v4
+        with:
+          path: x264-linux
+          key: x264-linux-${{ runner.os }}-${{ env.X264_REF }}
+
       - name: Clone and build x264 for Linux
         run: |
           git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-linux-source
           cd x264-linux-source
+          git fetch --depth 1 origin $X264_REF || true
+          git checkout $X264_REF
           ./configure \
             --prefix=$PWD/../x264-linux \
             --enable-static \
@@ -69,10 +79,25 @@ jobs:
           make install
           strip ../ffmpeg-linux-amd64/bin/ffmpeg
 
+      - name: Cache x264 win64
+        uses: actions/cache@v4
+        with:
+          path: x264-win64
+          key: x264-win64-${{ runner.os }}-${{ env.X264_REF }}
+
+      - name: Cache x264 win32
+        uses: actions/cache@v4
+        with:
+          path: x264-win32
+          key: x264-win32-${{ runner.os }}-${{ env.X264_REF }}
+
       - name: Install libx264 for cross-compilation
         run: |
           # Build x264 for Windows 64-bit
           git clone --depth 1 https://code.videolan.org/videolan/x264.git x264-source
+          
+          git fetch --depth 1 origin $X264_REF || true
+          git checkout $X264_REF
 
           # Build for win64
           cd x264-source
