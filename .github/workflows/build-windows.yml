@@ -79,7 +79,7 @@ jobs:
           strip ../output/bin/ffmpeg.exe
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact_name }}-${{ github.event.inputs.capture_device }}
           path: output/bin/ffmpeg.exe

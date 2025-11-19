@@ -161,21 +161,21 @@ jobs:
           i686-w64-mingw32-strip ../ffmpeg-win32/bin/ffmpeg.exe
 
       - name: Upload Linux AMD64 artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ffmpeg-linux-amd64
           path: ffmpeg-linux-amd64/bin/ffmpeg
           if-no-files-found: error
 
       - name: Upload Windows 64-bit artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ffmpeg-win64
           path: ffmpeg-win64/bin/ffmpeg.exe
           if-no-files-found: error
 
       - name: Upload Windows 32-bit artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ffmpeg-win32
           path: ffmpeg-win32/bin/ffmpeg.exe
