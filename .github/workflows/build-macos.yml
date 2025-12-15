@@ -70,7 +70,7 @@ jobs:
           cp THIRD_PARTY_NOTICES.txt artifact/
 
       - name: Upload macOS Intel artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ffmpeg-macos-intel
           path: artifact/*
@@ -141,7 +141,7 @@ jobs:
           cp THIRD_PARTY_NOTICES.txt artifact/
 
       - name: Upload macOS Apple Silicon artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ffmpeg-macos-arm64
           path: artifact/*
